@@ -5,8 +5,20 @@ import requests
 from datetime import datetime, timedelta, timezone, time
 import sqlite3
 
+import pytz
+
+
+
+# Example usage:
+# naive_utc_now = datetime.utcnow()
+# print(convert_to_german_time(naive_utc_now))
+
+
+
+
 # Define the UTC+2 timezone
-UTC_PLUS_2 = timezone(timedelta(hours=2))
+# german_tz = timezone(timedelta(hours=2))
+german_tz = pytz.timezone('Europe/Berlin')
 
 # check_broadcast
 conn = sqlite3.connect('broadcast.db')
@@ -79,6 +91,11 @@ def print_database(db_name):
     # Close the connection
     conn.close()
 
+def convert_to_german_time(tz_aware_datetime):
+    # Convert the timezone-aware datetime to German time
+    german_datetime = tz_aware_datetime.astimezone(german_tz)
+    return german_datetime
+
 
 async def del_last(chat_id):
     bot = Bot(token='5840248741:AAH1LvXXM2GyS9dQhGVo3IJp5VWV01LjjCA')
@@ -145,7 +162,7 @@ def get_today_all(event_names, events_dict):
     # Get today's date
     today = datetime.now().date()
     time_now = datetime.now()
-    if time_now.astimezone(UTC_PLUS_2).time() > time(13, 00):
+    if time_now.astimezone(german_tz).time() > time(13, 00):
         today = today + timedelta(days=1)
     # Initialize a list to store all events that start today
     today_events = []
@@ -194,6 +211,7 @@ def get_nextweek(event_names, events_dict):
 
 def schedule_send(chat_id, ical_link):
     asyncio.run(del_last(chat_id))
+
     broadcast_call(chat_id)
 
     # get the response
@@ -234,25 +252,27 @@ def schedule_send(chat_id, ical_link):
     event_all = get_today_all(events_dict.keys(), events_dict)
     if event_all:
         time_now = datetime.now()
-        if time_now.astimezone(UTC_PLUS_2).time() > time(13, 00):
+        if time_now.astimezone(german_tz).time() > time(13, 00):
             asyncio.run(call_send(chat_id, "Tomorrow's Schedule"))
         for event in event_all:
             location_list = event['location'].split(',')[:-1]
             location = ','.join(location_list)
+            start_time = convert_to_german_time(event['dtstart'])
+            end_time = convert_to_german_time(event['dtend'])
 
-            message = f"{event['summary']} @ {event['dtstart'].astimezone(UTC_PLUS_2).strftime('%H:%M')} -> {event['dtend'].astimezone(UTC_PLUS_2).strftime('%H:%M')} {location}"
+            message = f"{event['summary']} @ {start_time.strftime('%H:%M')} -> {end_time.strftime('%H:%M')} {location}"
             asyncio.run(call_send(chat_id, message))
             # print(f"End Date: {event['dtend']}")
-            # if event['dtstart'].astimezone(UTC_PLUS_2).time() < time(8, 30):
+            # if event['dtstart'].astimezone(german_tz).time() < time(8, 30):
             #     asyncio.run(call_send(chat_id, 'WAKE UP'))
 
 
 try:
     for user in get_all_users():
-        #delete_data(user[0])
+        # delete_data(user[0])
         schedule_send(user[0], user[1])
 except Exception as e:
+    print(e)
     asyncio.run(call_send('545628653', f"Error: {e}"))
 #print_database('thi_bot_database.db')
 # 30 15 * * 0-4 python3.8 thi_time_bot.py && curl -X GET https://hc-ping.com/5b56337b-b381-4968-8f7b-10e96447aec0
-
